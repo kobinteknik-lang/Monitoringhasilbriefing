@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Hasil Briefing Engineering - Database Google Sheets</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome untuk Icon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+
+    <!-- Header / Navbar -->
+    <header class="bg-indigo-900 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">MONITORING HASIL BRIEFING ENGINEERING</h1>
+                <p class="text-indigo-200 text-sm mt-1"><i class="far fa-database mr-2"></i>Database: Google Sheets (Real-time)</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex items-center gap-3">
+                <button onclick="fetchDataFromSheet()" id="sync-btn" class="bg-indigo-700 hover:bg-indigo-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                    <i class="fas fa-sync-alt" id="sync-icon"></i> Sinkronkan Data
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-indigo-600 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Pekerjaan</p>
+                    <h3 id="total-count" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 text-xl">
+                    <i class="fas fa-tasks"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-emerald-500 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Selesai</p>
+                    <h3 id="selesai-count" class="text-2xl font-bold text-emerald-600 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 text-xl">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-amber-500 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Proses</p>
+                    <h3 id="proses-count" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 text-xl">
+                    <i class="fas fa-spinner"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-5 border-l-4 border-rose-500 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Belum Mulai</p>
+                    <h3 id="belum-count" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+                </div>
+                <div class="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-rose-600 text-xl">
+                    <i class="fas fa-clock"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="bg-white rounded-xl shadow-sm p-5 mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+            <div class="w-full md:w-96 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" id="search-input" placeholder="Cari area, pekerjaan, atau PIC..." 
+                    class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                <label for="status-filter" class="text-sm font-medium text-slate-600">Filter Status:</label>
+                <select id="status-filter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">Semua Status</option>
+                    <option value="SELESAI">Selesai</option>
+                    <option value="PROSES">Proses</option>
+                    <option value="Belum Mulai">Belum Mulai</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading-state" class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-3xl text-indigo-600 mb-3"></i>
+            <p class="text-slate-500 font-medium">Mengambil data dari Google Sheets...</p>
+        </div>
+
+        <!-- Data Table Container -->
+        <div id="table-container" class="hidden bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-left">
+                    <thead class="bg-slate-100 text-slate-700 uppercase text-xs tracking-wider font-semibold">
+                        <tr>
+                            <th class="px-4 py-3 text-center w-12">No.</th>
+                            <th class="px-4 py-3">Area / Mesin</th>
+                            <th class="px-4 py-3">Uraian Pekerjaan</th>
+                            <th class="px-4 py-3">PIC</th>
+                            <th class="px-4 py-3 text-center">Mulai</th>
+                            <th class="px-4 py-3 text-center">Target Selesai</th>
+                            <th class="px-4 py-3 text-center">Status</th>
+                            <th class="px-4 py-3 text-center">Aktual Selesai</th>
+                            <th class="px-4 py-3">Evaluasi Target</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-200 text-sm text-slate-700 bg-white">
+                        <!-- Data dinamis via JS -->
+                    </tbody>
+                </table>
+            </div>
+            <!-- Empty state -->
+            <div id="empty-state" class="hidden text-center py-12">
+                <i class="fas fa-folder-open text-4xl text-slate-300 mb-3"></i>
+                <p class="text-slate-500 font-medium">Tidak ada data yang ditemukan.</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 py-6 text-center text-xs text-slate-500 border-t border-slate-200">
+        <p>&copy; 2026 Engineering Department - Database Integration</p>
+    </footer>
+
+    <!-- JavaScript Fetch Logic -->
+    <script>
+        // Ganti dengan URL Web App Google Apps Script Anda yang didapat dari Langkah 1
+        const SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_URL";
+
+        let rawData = [];
+
+        async function fetchDataFromSheet() {
+            const loadingState = document.getElementById('loading-state');
+            const tableContainer = document.getElementById('table-container');
+            const syncIcon = document.getElementById('sync-icon');
+
+            loadingState.classList.remove('hidden');
+            tableContainer.classList.add('hidden');
+            syncIcon.classList.add('fa-spin');
+
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+
+                rawData = data;
+                updateSummary(rawData);
+                renderTable(rawData);
+
+                loadingState.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+            } catch (error) {
+                console.error("Gagal mengambil data:", error);
+                alert("Gagal terhubung ke database Google Sheets. Pastikan URL Apps Script benar.");
+                loadingState.innerHTML = '<p class="text-rose-500 font-medium">Gagal memuat data dari database.</p>';
+            } finally {
+                syncIcon.classList.remove('fa-spin');
+            }
+        }
+
+        function updateSummary(data) {
+            document.getElementById('total-count').textContent = data.length;
+            document.getElementById('selesai-count').textContent = data.filter(d => (d.Status || "").toUpperCase() === 'SELESAI').length;
+            document.getElementById('proses-count').textContent = data.filter(d => (d.Status || "").toUpperCase() === 'PROSES').length;
+            document.getElementById('belum-count').textContent = data.filter(d => (d.Status || "").toLowerCase().includes('belum')).length;
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('table-body');
+            const emptyState = document.getElementById('empty-state');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            data.forEach((item, index) => {
+                const status = item.Status || "-";
+                let statusBadge = '';
+                if (status.toUpperCase() === 'SELESAI') {
+                    statusBadge = '<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Selesai</span>';
+                } else if (status.toUpperCase() === 'PROSES') {
+                    statusBadge = '<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Proses</span>';
+                } else {
+                    statusBadge = `<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-100 text-rose-800">${status}</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = index % 2 === 0 ? 'bg-white hover:bg-slate-50 transition-colors' : 'bg-slate-50/50 hover:bg-slate-50 transition-colors';
+                
+                tr.innerHTML = `
+                    <td class="px-4 py-3 text-center font-medium text-slate-500">${item['No.'] || (index + 1)}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">${item['Area / Mesin'] || '-'}</td>
+                    <td class="px-4 py-3 max-w-xs xl:max-w-md">${item['Uraian Pekerjaan'] || '-'}</td>
+                    <td class="px-4 py-3 text-slate-600">${item['PIC'] || '-'}</td>
+                    <td class="px-4 py-3 text-center text-xs text-slate-500 whitespace-nowrap">${item['Tanggal Mulai'] ? item['Tanggal Mulai'].substring(0, 10) : '-'}</td>
+                    <td class="px-4 py-3 text-center text-xs text-slate-500 whitespace-nowrap">${item['Target Selesai'] ? item['Target Selesai'].substring(0, 10) : '-'}</td>
+                    <td class="px-4 py-3 text-center whitespace-nowrap">${statusBadge}</td>
+                    <td class="px-4 py-3 text-center text-xs text-slate-500 whitespace-nowrap">${item['Tanggal Aktual Selesai'] ? item['Tanggal Aktual Selesai'].substring(0, 10) : '-'}</td>
+                    <td class="px-4 py-3 text-xs text-slate-500">${item['Evaluasi Target'] || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterData() {
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const statusVal = document.getElementById('status-filter').value;
+
+            const filtered = rawData.filter(item => {
+                const area = (item['Area / Mesin'] || '').toLowerCase();
+                const uraian = (item['Uraian Pekerjaan'] || '').toLowerCase();
+                const pic = (item['PIC'] || '').toLowerCase();
+                const status = (item['Status'] || '');
+
+                const matchSearch = area.includes(searchVal) || uraian.includes(searchVal) || pic.includes(searchVal);
+                const matchStatus = statusVal === '' || status === statusVal;
+                return matchSearch && matchStatus;
+            });
+
+            renderTable(filtered);
+        }
+
+        document.getElementById('search-input').addEventListener('input', filterData);
+        document.getElementById('status-filter').addEventListener('change', filterData);
+
+        // Load data otomatis saat pertama kali dibuka
+        window.onload = fetchDataFromSheet;
+    </script>
+</body>
+</html>
